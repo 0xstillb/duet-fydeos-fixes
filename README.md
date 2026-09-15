@@ -4,7 +4,7 @@ Tested on FydeOS 23.0-SP1 (`amd64-fydeos_iris`) running from a Live USB on a Len
 
 ## Current status
 
-- Power button: **WORKING** with native ChromeOS/Ash tablet behavior.
+- Power button short-press and wake: **WORKING** with native ChromeOS/Ash tablet behavior. Long-press menu is unavailable because firmware reports every press as an instantaneous pulse.
 - Auto Rotate: **WORKING / DO NOT MODIFY** (existing Python workaround).
 - Touchpad re-probe after keyboard detach/reattach: **WORKING / DO NOT MODIFY**.
 - S2Idle suspend/resume: **SHORT TEST PASSED (32 seconds)** using the physical Power button to wake; longer tests remain pending.
