@@ -65,7 +65,7 @@ This was display-off/lock, not system suspend:
 
 The current `[s2idle] deep` selection is separate from this Power-button fix and was not changed here.
 
-Long-press behavior was not deliberately exercised to avoid an accidental shutdown. The native tablet controller retains the normal timed power-menu/shutdown path.
+Long-press was physically tested and does not open the menu on this device. The Intel HID input path reports an immediate synthetic release, so Ash cannot measure the physical hold duration; see "Long-press limitation" below.
 
 ### Files changed and backup
 
@@ -148,3 +148,23 @@ Resume warnings:
 - Despite these warnings, the display returned and the test remained usable.
 
 Status: **SHORT S2IDLE TEST PASSED (32 seconds)**. A full one-minute and longer-duration test remain pending.
+
+### Long-press limitation
+
+A physical approximately two-second Power-button hold was captured simultaneously from the two native Power-capable input devices:
+
+- `/dev/input/event2` (`Power Button`, ACPI `PNP0C0C`) reported no event.
+- `/dev/input/event15` (`Intel HID 5 button array`, `INTC1070`) reported `KEY_POWER=1` followed by `KEY_POWER=0` only 27 microseconds later.
+- powerd consequently logged Power-button down/up only about 3.5 milliseconds apart and requested that the backlights be forced off.
+- The suspend-success counter did not change, confirming that this was screen-off rather than suspend.
+
+The firmware/Intel HID path therefore exposes the side button as an instantaneous pulse and does not expose the physical hold duration to userspace. Ash cannot distinguish a two-second hold from a tap.
+
+Native behavior tradeoff on this build:
+
+- With `--aura-legacy-power-button`: every pulse takes the legacy menu/lock path, including short presses.
+- With `!--aura-legacy-power-button` plus `--force-tablet-power-button`: every pulse is treated as a short tablet press, providing the desired screen off/on behavior but no timed long-press menu.
+
+There is no additional supported `--force-clamshell-power-button` switch in the installed Chrome binary, and combining the legacy and tablet switches does not help because Ash dispatches to the legacy handler first.
+
+Decision: keep the tablet short-press fix because it provides the requested everyday tablet behavior. Use the on-screen system menu for normal shutdown. A firmware-level very-long hold may still force power off, but it is an emergency action that risks data loss and was not tested. Implementing a different long-press gesture would require a non-native workaround and cannot recover hold duration that the kernel input interface never reports.
