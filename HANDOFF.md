@@ -151,14 +151,15 @@ Status: **SHORT S2IDLE TEST PASSED (32 seconds)**. A full one-minute and longer-
 
 ### Long-press limitation
 
-A physical approximately two-second Power-button hold was captured simultaneously from the two native Power-capable input devices:
+Physical approximately two-second Power-button holds were captured across all three native Power-capable host input devices:
 
 - `/dev/input/event2` (`Power Button`, ACPI `PNP0C0C`) reported no event.
+- `/dev/input/event14` (`Intel HID events`, `INTC1070`) advertises `KEY_POWER` support but reported no event.
 - `/dev/input/event15` (`Intel HID 5 button array`, `INTC1070`) reported `KEY_POWER=1` followed by `KEY_POWER=0` only 27 microseconds later.
 - powerd consequently logged Power-button down/up only about 3.5 milliseconds apart and requested that the backlights be forced off.
 - The suspend-success counter did not change, confirming that this was screen-off rather than suspend.
 
-The firmware/Intel HID path therefore exposes the side button as an instantaneous pulse and does not expose the physical hold duration to userspace. Ash cannot distinguish a two-second hold from a tap.
+The only active side-button path is therefore `event15`; the firmware/Intel HID path exposes it as an instantaneous pulse and does not expose the physical hold duration to userspace. Ash cannot distinguish a two-second hold from a tap.
 
 Native behavior tradeoff on this build:
 
