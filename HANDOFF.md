@@ -110,3 +110,41 @@ Then restart only the UI.
 ### Persistence
 
 The fix is stored in `/etc/chrome_dev.conf` on the Live USB root filesystem and survives UI restarts. A full reboot with these newly added lines has not yet been physically tested, so reboot persistence is expected but not yet marked verified.
+
+## Suspend / Resume
+
+### S2Idle Power-button wake test
+
+On 2026-09-15, a controlled native suspend was requested through `/usr/bin/powerd_dbus_suspend` while `/sys/power/mem_sleep` showed `[s2idle] deep`.
+
+Pre-test state:
+
+- Successful suspend count: `0`
+- Failed suspend count: `0`
+- ACPI `PNP0C0C` wake setting: `enabled`
+- Touchscreen: HIMX1234 at `/dev/input/event4`, bound to `hid-multitouch`
+- Auto Rotate daemon: running
+
+Result:
+
+- powerd configured suspend mode to `s2idle` and completed the suspend request successfully.
+- The system remained suspended for approximately 32 seconds, so this is a short suspend test rather than a completed one-minute test.
+- The user physically woke the device with a short press of the side Power button.
+- Successful suspend count increased from `0` to `1`; failed count remained `0`.
+- Display resumed and the user physically confirmed that touchscreen input still worked.
+- Auto Rotate daemon remained running after resume.
+- No reboot or crash occurred.
+
+Wake-source evidence:
+
+- `/sys/power/pm_wakeup_irq` reported IRQ `9`.
+- `/sys/devices/platform/INTC1070:00` event count increased from `0` to `1`.
+- The ACPI `PNP0C0C` Power-button event counter remained `0`.
+- This indicates that the physical side Power button wakes this device through the Intel HID (`INTC1070`) path rather than the generic ACPI Power Button path.
+
+Resume warnings:
+
+- The kernel logged `i915`/DSI display warnings including `DSI link not ready` and pipe-mode mismatch messages after resume.
+- Despite these warnings, the display returned and the test remained usable.
+
+Status: **SHORT S2IDLE TEST PASSED (32 seconds)**. A full one-minute and longer-duration test remain pending.
