@@ -1,0 +1,112 @@
+# Lenovo IdeaPad Duet 5 12IAU7 — FydeOS Fixes
+
+Test system: FydeOS 23.0-SP1 (`amd64-fydeos_iris`), Chrome 150.0.7871.208, Live USB.
+
+## Working Fixes — Do Not Modify
+
+- **Auto Rotate = WORKING / DO NOT MODIFY.** The existing Python workaround at `/usr/local/duet-autorotate/duet-autorotate daemon` remained running after the UI restart and power-button test. No autorotate file or logic was changed during this work.
+- **Touchpad re-probe workaround = WORKING / DO NOT MODIFY.** Existing recovery command after keyboard detach/reattach:
+
+  ```sh
+  sudo sh -c 'printf "%s\n" "1-3:1.1" > /sys/bus/usb/drivers_probe'
+  ```
+
+  No touchpad workaround file or logic was changed during this work.
+
+## Power Button
+
+### Original symptom
+
+A short press of the physical Power button opened the shutdown/sign-out/lock power menu instead of turning the display off and locking the device.
+
+### Root cause
+
+The generic FydeOS build enables the `legacy_power_button` build setting:
+
+- `/etc/ui_use_flags.txt` contains `legacy_power_button`.
+- `/usr/share/power_manager/legacy_power_button` contains `1`.
+- Session manager consequently launched Chrome/Ash with `--aura-legacy-power-button`.
+
+The physical ACPI Power Button reports distinct down and up events, but `--aura-legacy-power-button` tells Ash to use the legacy ACPI interpretation where release timing is not meaningful. That made a short press take the legacy power-menu path. The installed Chrome binary contains native support for `--force-tablet-power-button`; it contains no `--force-clamshell-power-button` switch.
+
+ChromiumOS reference: <https://chromium.googlesource.com/chromiumos/platform2/+/HEAD/power_manager/docs/power_buttons.md>
+
+### Native fix
+
+Changed `/etc/chrome_dev.conf` by adding only these directives:
+
+```text
+!--aura-legacy-power-button
+--force-tablet-power-button
+```
+
+The first directive removes the conflicting build-injected legacy Ash switch. This removal is required because Ash selects the legacy handler before evaluating tablet behavior. The second directive forces tablet-like Power-button behavior even when the detachable keyboard is attached.
+
+`/usr/share/power_manager/legacy_power_button` was intentionally left unchanged. In powerd that preference selects which duplicate input interface is ignored; Ash controls the user-visible short/long-press behavior.
+
+After `restart ui`, the active browser command line contained `--force-tablet-power-button` and did not contain `--aura-legacy-power-button`.
+
+### Verification
+
+Physical test confirmed:
+
+- Short press while awake -> display off / lock; no shutdown menu.
+- Short press again -> display wakes normally; no reboot.
+- Touchscreen device remained present at `/dev/input/event4`, bound to `hid-multitouch`.
+- Auto Rotate daemon remained running.
+
+This was display-off/lock, not system suspend:
+
+- Before and after the test, `/sys/power/suspend_stats/success` was `0` and `fail` was `0`.
+- Uptime remained continuous.
+- powerd logged `Received request to start forcing backlights off` and brightness `0%` on the first press.
+- powerd logged `Received request to stop forcing backlights off` and restored brightness on the second press.
+- No suspend/resume entry occurred during the button test.
+
+The current `[s2idle] deep` selection is separate from this Power-button fix and was not changed here.
+
+Long-press behavior was not deliberately exercised to avoid an accidental shutdown. The native tablet controller retains the normal timed power-menu/shutdown path.
+
+### Files changed and backup
+
+System configuration changed:
+
+- `/etc/chrome_dev.conf`
+
+Backup created before editing:
+
+- `/etc/chrome_dev.conf.power-button.bak-20260915T1605Z`
+- Original SHA-256: `896d997f033a48ca065d009782b6a03c41a4a58e133f7246e32e815ad5a83602`
+
+Documentation created because the requested `duet-fydeos-fixes/HANDOFF.md` was not present in the accessible Live USB/user paths:
+
+- `/home/chronos/user/MyFiles/Downloads/duet-fydeos-fixes/HANDOFF.md`
+
+The Live USB root filesystem was temporarily remounted read-write for the backed-up edit and then restored to read-only. No internal Windows/NVMe partition, BIOS/UEFI, kernel, autorotate file, or touchpad workaround was modified.
+
+### Rollback
+
+The exact backup restore sequence is:
+
+```sh
+sudo mount -o remount,rw /
+sudo cp --preserve=mode,ownership,timestamps \
+  /etc/chrome_dev.conf.power-button.bak-20260915T1605Z \
+  /etc/chrome_dev.conf
+sudo chmod 0644 /etc/chrome_dev.conf
+sudo mount -o remount,ro /
+sudo restart ui
+```
+
+This restores the entire pre-test file. If unrelated lines are added to `chrome_dev.conf` later, remove only the following two exact lines instead of restoring the old backup:
+
+```text
+!--aura-legacy-power-button
+--force-tablet-power-button
+```
+
+Then restart only the UI.
+
+### Persistence
+
+The fix is stored in `/etc/chrome_dev.conf` on the Live USB root filesystem and survives UI restarts. A full reboot with these newly added lines has not yet been physically tested, so reboot persistence is expected but not yet marked verified.
