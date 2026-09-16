@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/bin/bash /home/chronos/user/MyFiles/Downloads/duet-fydeos-fixes/bluetooth-keyboard/duet5-mode.sh pogo
