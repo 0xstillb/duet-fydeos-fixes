@@ -1,0 +1,64 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: FydeOS Duet Bluetooth debug <local@invalid>
+Date: Wed, 16 Sep 2026 00:00:00 +0000
+Subject: [PATCH] floss: keep Duet 5 KB on the userspace HOGP bridge
+
+The Lenovo Duet 5 KB report map is repaired by patch 0001.  Its native
+Floss HoGP background connection still starts four concurrent GATT clients,
+and the generic Battery Service client starts another discovery on the same
+privacy-addressed peer.  The keyboard then repeatedly returns a supervision
+timeout before UHID is ready.  Match only the verified report-map prefix and
+device name; unrelated HID and battery devices retain the old behavior.
+
+--- a/system/bta/hh/bta_hh_le.cc
++++ b/system/bta/hh/bta_hh_le.cc
+@@ -1360,6 +1360,16 @@ static void get_lenovo_duet_5_rpt_map(tBTA_HH_LE_HID_SRVC* p_srvc, uint16_t* len,
+   *len += sizeof(kResidualReportMap);
+ }
+ 
++static bool is_lenovo_duet_5_report_map(const tBTA_HH_DEV_DSCP_INFO& dscp_info) {
++  // Patch 0001 may expose either the received 512-byte prefix or the repaired
++  // descriptor.  Hash only the first GATT_MAX_ATTR_LEN bytes so the match is
++  // independent of the cached repaired length.
++  if (dscp_info.descriptor.dl_len < GATT_MAX_ATTR_LEN ||
++      dscp_info.descriptor.dsc_list == nullptr) {
++    return false;
++  }
++  return is_lenovo_duet_5_truncated_report_map(
++      GATT_MAX_ATTR_LEN, dscp_info.descriptor.dsc_list);
++}
++
+ void bta_hh_le_save_report_map(tBTA_HH_DEV_CB* p_dev_cb, uint16_t len, uint8_t* desc) {
+   tBTA_HH_LE_HID_SRVC* p_srvc = &p_dev_cb->hid_srvc;
+ 
+@@ -2187,7 +2197,14 @@ uint8_t bta_hh_le_add_device(tBTA_HH_DEV_CB* p_cb, const tBTA_HH_MAINT_DEV* p_dev_info) {
+                             &p_dev_info->dscp_info.descriptor, p_dev_info->sub_class,
+                             p_dev_info->dscp_info.ssr_max_latency,
+                             p_dev_info->dscp_info.ssr_min_tout, p_dev_info->app_id);
+ 
+-  bta_hh_le_add_dev_bg_conn(p_cb);
++  if (is_lenovo_duet_5_report_map(p_dev_info->dscp_info)) {
++    log::info("Skipping native HoGP background reconnect for verified Lenovo Duet 5 KB");
++  } else {
++    bta_hh_le_add_dev_bg_conn(p_cb);
++  }
+ 
+   return p_cb->hid_handle;
+ }
+
+--- a/floss/rust/linux/stack/src/lib.rs
++++ b/floss/rust/linux/stack/src/lib.rs
+@@ -443,7 +443,17 @@
+                 ) => {
+                     if ble_acl_state == BtAclState::Connected && bond_state == BtBondState::Bonded {
+                         info!("BAS: Connecting to {}", DisplayAddress(&addr));
+-                        battery_service.lock().unwrap().init_device(addr);
++                        let device = BluetoothDevice::new(addr, "Duet 5 KB".to_string());
++                        let name = bluetooth.lock().unwrap().get_remote_name(device);
++                        if name == "Duet 5 KB" {
++                            info!("BAS: skipping native battery discovery for Lenovo Duet 5 KB");
++                        } else {
++                            battery_service.lock().unwrap().init_device(addr);
++                        }
+                     }
+                 }

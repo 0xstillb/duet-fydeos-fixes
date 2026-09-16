@@ -1,0 +1,15 @@
+Installed Floss build — 2026-09-15 UTC
+Package: net-wireless/floss-0.0.2-r8327
+Repository: chromiumos
+AOSP Bluetooth commit: 85ccfbdb4f09b90bc1d7171ac77c979e9b299e2e
+ChromiumOS platform2 commit: 80f0af0f035939bdd66073ebce66ff04ace2bafa
+btadapterd: /usr/bin/btadapterd
+size: 12469120
+sha256: f558b5cf7f5dccbdb5292155ed829e1f9058e4b2dc993bfc5ea1d8af71455ca8
+btmanagerd sha256: 2cc592a553e114c53a395e3d21375fe060c5312dec1d371b51b1a45ce17035f0
+
+Exact source path: system/bta/hh/bta_hh_le.cc
+Defect path: read_hid_report_map_cb -> bta_hh_le_save_report_map -> bta_hh_co_send_hid_info -> UHID
+Existing long-map quirk: INTEROP_HOGP_LONG_REPORT, only 03f6:a001 Brydge.
+Existing implementation appends a hard-coded 101-byte Brydge residual after a 512-byte read and matches only DIS vendor/product IDs.
+Duet 5 KB reports vendor/product 0000:0000, so the config-only path cannot select it safely. Adding 0000:0000 would affect unrelated HOGP devices, and adding its name would not match interop_match_vendor_product_ids.

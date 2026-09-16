@@ -1,0 +1,46 @@
+Lenovo Duet 5 KB descriptor comparison — 2026-09-15 UTC
+
+Observed BLE HOGP Report Map
+  length: 512 bytes
+  sha256: 262ed064b3a701846b7fd6eb4a7c7ce82ff2809cb1f1be71b42a07e1b30efd0b
+  source: Floss GATT ReadCharacteristic, HID Report Map handle 39, status 0
+  final bytes (offset 509..511): 05 0d 09
+  parse result: offset 509 Usage Page(Digitizers) is complete; offset 511 is a one-byte Usage item header with its required data byte missing.
+
+Working pogo USB HID descriptors
+  keyboard: 65 bytes, sha256 5d2632c6a469ba4e8c722cfb8750332619605acd433cd38d88329dc5ddad7dae
+  composite/touchpad: 913 bytes, sha256 062662146e21d55159fc06f07eaa9735289dde6542ada3a5943312c11ffe89cb
+
+Literal prefix comparison
+  BLE vs pogo composite matching prefix: 3 bytes
+  first difference: zero-based offset 3 (BLE 06 = Keyboard usage; pogo composite 80 = System Control usage)
+  BLE vs pogo keyboard matching prefix: 6 bytes
+  first difference: zero-based offset 6 (BLE 85 = Report ID; pogo keyboard 05 = Usage Page)
+  Therefore BLE is not a literal prefix of either USB descriptor. Bluetooth merges and changes the two USB interface maps.
+
+Structural comparison
+  BLE touchpad Application Collection starts at offset 264, Report ID 6.
+  Pogo touchpad Application Collection starts at offset 164, Report ID 4.
+  Both describe five repeated Finger Physical Collections followed by Scan Time, Contact Count, and button fields.
+  BLE contains three full contact blocks and begins the fourth at offsets 509..511 before GATT truncates it.
+  The live BLE Report ID 6 characteristic is exactly 24 bytes. Five BLE contacts consume 20 bytes; the pogo-verified common tail consumes 4 bytes, proving the required 24-byte layout.
+
+Original missing suffix
+  Exact original BLE suffix length/bytes are not observable: HOGP uses a GATT attribute whose maximum value is 512 bytes, and this nonconforming device cannot return bytes beyond 512.
+  Do not claim the USB bytes at offset 512 are the BLE suffix; they are not.
+
+Minimal verified repair residual
+  length: 207 bytes
+  sha256: 86f46977e5b1ca3a91bafc952290c5b7f334f973e044a8e1b177c17cd97312df
+  construction:
+    - complete fourth BLE contact block from an observed complete BLE block
+    - append fifth identical BLE contact block
+    - append working-pogo Scan Time, Contact Count, and button tail
+    - close the touchpad Application Collection
+  repaired descriptor length: 719 bytes
+  repaired sha256: 6d8472b344592896718356859ad9896eed46fa0e7738e93616a026bdfc23085f
+  validation: no incomplete item, collection depth returns to zero, Report ID 6 input is 192 bits/24 bytes.
+
+Conclusion
+  ROOT CAUSE CONFIRMED by the alternative-source path (not by literal USB prefix):
+  device Report Map is truncated at the GATT 512-byte limit -> HID item at offset 511 is incomplete -> Linux hid-multitouch returns EINVAL -> UHID never signals ready -> Floss uhid_ready_disconn_timeout -> reconnect loop.
