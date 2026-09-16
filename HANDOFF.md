@@ -453,3 +453,10 @@ sudo env DUET_ALLOW_INTERNAL_ROOT=YES bash uninstall-fydeos-floss.sh
 ```
 
 The installers require explicit confirmation and make timestamped backups. They are not run on this session's internal Windows/NVMe storage. The current Live USB runtime remains active until the user stops the bridge and restores the original init configuration.
+
+### Auto-mode detach/reattach retest (2026-09-16)
+
+The physical detach path was tested with `duet5-auto-mode.sh`. With the pogo keyboard attached, `/sys/bus/usb/devices/1-3:1.1` was present; after detaching it disappeared and the monitor correctly printed `switching to bt`. The bridge and Floss services restarted.
+
+This did **not** pass the Bluetooth reconnect criterion: the bridge entered the same reconnect loop and its log recorded `btclient exited: -6` (Floss callback/GATT collision). The runtime GATT filter produced no block log, so this experiment is recorded as a partial convenience workaround, not a successful permanent fix. Reattaching the pogo keyboard remains supported, but stable Bluetooth off/on reconnect still requires the source-patched `btadapterd` (`0001` + `0002`).
+
