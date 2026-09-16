@@ -76,6 +76,18 @@ def send_input(fd, report_id, value):
     payload = struct.pack("<H4096s", len(data), data.ljust(UHID_DATA_MAX, b"\0"))
     os.write(fd, uhid_event(UHID_INPUT2, payload))
 
+def write_runtime_file(path, text):
+    """Publish a small watchdog state file without exposing partial contents."""
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp.write_text(text)
+        os.replace(tmp, path)
+    finally:
+        try:
+            tmp.unlink()
+        except FileNotFoundError:
+            pass
+
 def find_created_hid():
     for path in glob.glob("/sys/bus/hid/devices/*/uevent"):
         try:
@@ -201,6 +213,10 @@ def main():
                         if not address:
                             address = candidate
                             print("Found bonded Duet 5 KB (privacy address withheld)", flush=True)
+                            try:
+                                write_runtime_file(Path("/tmp/duet5-active-address"), address)
+                            except Exception:
+                                pass
                             queue("gatt register-client")
 
                     match = REGISTERED_RE.search(line)
@@ -211,7 +227,7 @@ def main():
                         if not registered:
                             registered = True
                             client_id = registered_client_id
-                            Path("/tmp/duet5-bridge-client-id").write_text(str(client_id))
+                            write_runtime_file(Path("/tmp/duet5-bridge-client-id"), str(client_id))
                             print(f"Floss GATT client registered: id={client_id}", flush=True)
                             queue("gatt set-connect-transport LE")
                             queue("gatt set-auth-req EncNoMitm")
@@ -230,6 +246,10 @@ def main():
                             address_index = addresses.index(address)
                             connected = True
                             print("Floss GATT connection active", flush=True)
+                            try:
+                                write_runtime_file(Path("/tmp/duet5-active-address"), address)
+                            except Exception:
+                                pass
                             notification_setup = False
                             mode_set = False
                         elif callback_address == address:
@@ -313,10 +333,18 @@ def main():
             Path("/tmp/duet5-bridge-client-id").unlink()
         except FileNotFoundError:
             pass
+        try:
+            Path("/tmp/duet5-active-address").unlink()
+        except FileNotFoundError:
+            pass
         print("Stopping bridge", flush=True)
     finally:
         try:
             Path("/tmp/duet5-bridge-client-id").unlink()
+        except FileNotFoundError:
+            pass
+        try:
+            Path("/tmp/duet5-active-address").unlink()
         except FileNotFoundError:
             pass
         if address and registered:

@@ -70,7 +70,7 @@ The tested fallback uses the repaired 640-byte UHID descriptor and a Floss GATT 
 
 The user typed `DUET LIVE 123`. A monitor that discarded payload contents observed 1,656 bytes on event13 and 203,952 bytes on event24. A 10-minute monitor completed with no new `GATT_CONN_TIMEOUT`, `item fetching failed at offset 511/512`, `probe error -22`, or `uhid_ready_disconn_timeout`.
 
-The runtime package is not the final Floss source fix. It uses a bridge process plus a small watchdog that unregisters the known native Floss GATT clients while the bridge owns the Duet connection. It is reversible and board-specific. It does not wipe bonds or change firmware/kernel/Wi-Fi. It must be installed only after reviewing the scripts.
+The runtime package is not the final Floss source fix. It uses a bridge process plus a watchdog that unregisters known native Floss GATT clients while the bridge owns the Duet connection. The updated installer preloads `libduet5-gatt-filter-hotfix.so` into `btadapterd` to prevent RPA GATT collisions and ensures the watchdog does not unregister the bridge's own client ID. It is reversible and board-specific. It does not wipe bonds or change firmware/kernel/Wi-Fi. It must be installed only after reviewing the scripts.
 
 ## Fresh FydeOS installation and fresh pairing
 

@@ -13,13 +13,15 @@ cd /home/chronos/user/MyFiles/Downloads/duet-fydeos-fixes/bluetooth-keyboard
 /usr/bin/sudo bash duet5-auto-mode.sh
 ```
 
-Leave that terminal/process running. Stop it with `Ctrl-C`. This is a
-convenience workaround only; it does not replace the patched `btadapterd`
-needed to eliminate the native Floss HoGP/BAS reconnect collision.
+Leave that terminal/process running. Stop it with `Ctrl-C`.
 
-### Auto-mode detach/reattach retest (2026-09-16)
+### Loop Fix & RPA Filter Hotfix Update
 
-The physical detach path was tested with `duet5-auto-mode.sh`. With the pogo keyboard attached, `/sys/bus/usb/devices/1-3:1.1` was present; after detaching it disappeared and the monitor correctly printed `switching to bt`. The bridge and Floss services restarted.
+The reconnect loop previously observed during detach/reattach was caused by two issues:
+1. `run-duet5-bridge.sh` blindly called `UnregisterClient` on client IDs 43, 45, 46, 48, 50 without checking if `btclient` (the bridge itself) was assigned one of those IDs by Floss, causing an assertion failure and `SIGABRT` (`btclient exited: -6`).
+2. `install-live-bridge.sh` failed to configure `LD_PRELOAD` in `/etc/init/btadapterd.conf` because the template file was missing, and it did not install `libduet5-gatt-filter-hotfix.so` to handle RPA (Resolvable Private Address).
 
-This did **not** pass the Bluetooth reconnect criterion: the bridge entered the same reconnect loop and its log recorded `btclient exited: -6` (Floss callback/GATT collision). The runtime GATT filter produced no block log, so this experiment is recorded as a partial convenience workaround, not a successful permanent fix. Reattaching the pogo keyboard remains supported, but stable Bluetooth off/on reconnect still requires the source-patched `btadapterd` (`0001` + `0002`).
-
+With the updated runtime fix:
+- `libduet5-gatt-filter-hotfix.so` is preloaded via `/etc/init/btadapterd.conf` to block competing native Floss clients from opening connections to the Duet 5 KB.
+- `run-duet5-bridge.sh` checks `/tmp/duet5-bridge-client-id` and explicitly skips unregistering the bridge's own client ID.
+- The active Bluetooth address is recorded in `/tmp/duet5-active-address`.
