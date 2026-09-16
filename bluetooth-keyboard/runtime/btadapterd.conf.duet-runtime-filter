@@ -1,0 +1,15 @@
+# Copyright 2026 The ChromiumOS Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+description     "Bluetooth Adapter daemon with Duet 5 GATT filter"
+author          "chromium-os"
+
+stop on stopping btmanagerd
+respawn
+respawn limit 5 10
+
+# Preload Duet 5 GATT filter hotfix to block competing native HoGP/BAS clients
+env LD_PRELOAD=/usr/local/duet-bt-debug/libduet5-gatt-filter-hotfix.so
+
+exec /usr/bin/btadapterd

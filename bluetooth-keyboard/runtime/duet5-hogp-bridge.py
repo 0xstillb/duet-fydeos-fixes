@@ -201,6 +201,10 @@ def main():
                         if not address:
                             address = candidate
                             print("Found bonded Duet 5 KB (privacy address withheld)", flush=True)
+                            try:
+                                Path("/tmp/duet5-active-address").write_text(address)
+                            except Exception:
+                                pass
                             queue("gatt register-client")
 
                     match = REGISTERED_RE.search(line)
@@ -230,6 +234,10 @@ def main():
                             address_index = addresses.index(address)
                             connected = True
                             print("Floss GATT connection active", flush=True)
+                            try:
+                                Path("/tmp/duet5-active-address").write_text(address)
+                            except Exception:
+                                pass
                             notification_setup = False
                             mode_set = False
                         elif callback_address == address:
@@ -313,10 +321,18 @@ def main():
             Path("/tmp/duet5-bridge-client-id").unlink()
         except FileNotFoundError:
             pass
+        try:
+            Path("/tmp/duet5-active-address").unlink()
+        except FileNotFoundError:
+            pass
         print("Stopping bridge", flush=True)
     finally:
         try:
             Path("/tmp/duet5-bridge-client-id").unlink()
+        except FileNotFoundError:
+            pass
+        try:
+            Path("/tmp/duet5-active-address").unlink()
         except FileNotFoundError:
             pass
         if address and registered:
