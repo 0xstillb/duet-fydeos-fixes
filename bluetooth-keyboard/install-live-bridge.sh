@@ -57,7 +57,11 @@ cp --preserve=mode,ownership,timestamps "$STATE/btadapterd.conf.duet-runtime-fil
 
 # Install Upstart bridge service
 if [ -f /etc/init/duet5-hogp-bridge.conf ]; then
-  cp --preserve=mode,ownership,timestamps /etc/init/duet5-hogp-bridge.conf "$STATE/duet5-hogp-bridge.conf.original-$stamp"
+  bridge_backup="$STATE/duet5-hogp-bridge.conf.original-$stamp"
+  cp --preserve=mode,ownership,timestamps /etc/init/duet5-hogp-bridge.conf "$bridge_backup"
+  printf '%s\n' "$bridge_backup" > "$STATE/duet5-hogp-bridge.conf.current-backup"
+else
+  rm -f "$STATE/duet5-hogp-bridge.conf.current-backup"
 fi
 cp --preserve=mode,ownership,timestamps "$SRC/runtime/duet5-hogp-bridge.conf" /etc/init/duet5-hogp-bridge.conf
 

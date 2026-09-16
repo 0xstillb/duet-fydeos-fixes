@@ -20,6 +20,16 @@ while :; do
       bridge_id=$(cat "$CLIENT_ID_FILE" 2>/dev/null || true)
     fi
 
+    # Wait for the bridge to publish a complete numeric client ID.  The bridge
+    # writes this file atomically; without this guard the watchdog can race
+    # registration and unregister the bridge's own Floss client.
+    case "$bridge_id" in
+      ''|*[!0-9]*)
+        sleep 0.5
+        continue
+        ;;
+    esac
+
     for id in $IDS; do
       # Do not unregister the bridge client ID; doing so causes btclient assertion failure (SIGABRT/-6)
       if [ -n "$bridge_id" ] && [ "$id" = "$bridge_id" ]; then
